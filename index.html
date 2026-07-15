@@ -241,7 +241,7 @@ main.content{padding:26px 30px 50px;max-width:1560px;}
 .next-step-item b{color:var(--text-hi);font-weight:600;}
 .next-step-item span{color:var(--text-md);}
 .chip-row{display:flex;flex-wrap:wrap;gap:8px;}
-.chip{background:var(--bg-soft);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:11.5px;font-weight:600;color:var(--text-md);}
+.chip{background:var(--bg-soft);border:1px solid var(--border);border-radius:999px;padding:5px 12px 5px 5px;font-size:11.5px;font-weight:600;color:var(--text-md);display:inline-flex;align-items:center;gap:6px;}
 
 /* ================= badges ================= */
 .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.02em;white-space:nowrap;color:#fff;}
@@ -363,8 +363,11 @@ main.content{padding:26px 30px 50px;max-width:1560px;}
 .info-cell{background:var(--bg-soft);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;}
 .info-cell .ic-lbl{font-size:10.5px;color:var(--text-lo);text-transform:uppercase;letter-spacing:.05em;font-weight:600;}
 .info-cell .ic-val{font-size:13px;font-weight:600;margin-top:5px;color:var(--text-hi);line-height:1.35;}
-.avatar-list{display:flex;flex-direction:column;gap:6px;margin-top:2px;}
-.avatar-row{display:flex;align-items:center;gap:7px;}
+.avatar-list{display:flex;flex-direction:column;gap:8px;margin-top:3px;}
+.avatar-row{display:flex;align-items:center;gap:9px;}
+.avatar-row span:last-child{font-size:13px;}
+.avatar-inline-list{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.avatar-inline-item{display:inline-flex;align-items:center;gap:5px;}
 .avatar-img{border-radius:50%;object-fit:cover;flex:none;border:1.5px solid var(--bg-card);box-shadow:0 0 0 1px var(--border);}
 .avatar-generic{border-radius:50%;background:var(--bg-soft);color:var(--text-lo);flex:none;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--bg-card);box-shadow:0 0 0 1px var(--border);}
 .avatar-generic svg{width:60%;height:60%;}
@@ -470,6 +473,8 @@ main.content{padding:26px 30px 50px;max-width:1560px;}
 .slide-block .milestone,.slide-block .list-item,.slide-block .risk-item{font-size:11px;margin-bottom:7px;padding:7px 9px;}
 .slide-block .milestone .m-text,.slide-block .list-item{font-size:11px;}
 .slide-block .risk-panel{border:none;background:none;padding:0;}
+.slide-block .avatar-row span:last-child{font-size:11px;}
+.slide-block .avatar-list{gap:5px;}
 .slide-block .m-when,.slide-block .li-when{font-size:9.5px;}
 .slide-block .text-block{font-size:11.5px;padding:10px 12px;}
 
@@ -840,16 +845,21 @@ function avatarFallback(img, name, size){
   img.replaceWith(span);
 }
 function avatarHTML(name, size){
-  size = size || 22;
+  size = size || 32;
   const url = state.peoplePhotos[norm(name)];
   const safeName = escapeHtml(name);
   if(url) return `<img src="${escapeHtml(url)}" class="avatar-img" style="width:${size}px;height:${size}px;" title="${safeName}" onerror="avatarFallback(this,'${safeName.replace(/'/g,"&#39;")}',${size})">`;
   return `<span class="avatar-generic" style="width:${size}px;height:${size}px;" title="${safeName}">${GENERIC_AVATAR_SVG}</span>`;
 }
 // Lista de pessoas com avatar + nome, uma por linha — usado nos campos de governança do one page.
-function peopleWithAvatarsHTML(names){
+function peopleWithAvatarsHTML(names, size){
   if(!names || !names.length) return "N/I";
-  return `<div class="avatar-list">${names.map(n=>`<span class="avatar-row">${avatarHTML(n)}<span>${escapeHtml(n)}</span></span>`).join("")}</div>`;
+  return `<div class="avatar-list">${names.map(n=>`<span class="avatar-row">${avatarHTML(n, size)}<span>${escapeHtml(n)}</span></span>`).join("")}</div>`;
+}
+// Mesma ideia, mas lado a lado com quebra de linha — usado em espaços compactos (cards, slide).
+function avatarInlineListHTML(names, size){
+  if(!names || !names.length) return "—";
+  return `<span class="avatar-inline-list">${names.map(n=>`<span class="avatar-inline-item">${avatarHTML(n, size)}<span>${escapeHtml(n)}</span></span>`).join("")}</span>`;
 }
 function col(row, names){
   const keys = Object.keys(row);
@@ -1281,7 +1291,7 @@ function renderHome(){
 
   const sponsorMap = mapCount(P.flatMap(p=>p.sponsor));
   const topSponsors = topEntries(sponsorMap, 8);
-  document.getElementById("execSponsors").innerHTML = topSponsors.length ? topSponsors.map(([name,n])=>`<span class="chip">${escapeHtml(name)} · ${n}</span>`).join("")
+  document.getElementById("execSponsors").innerHTML = topSponsors.length ? topSponsors.map(([name,n])=>`<span class="chip">${avatarHTML(name,18)} ${escapeHtml(name)} · ${n}</span>`).join("")
     : `<div style="color:var(--text-lo);font-size:12px;">Sem dados de sponsor.</div>`;
 }
 
@@ -1325,9 +1335,10 @@ function renderProjetos(){
         <div class="pc-badges"><span class="badge ${p.statusMeta.color}">${escapeHtml(p.statusMeta.label)}</span>${p.atrasado?`<span class="delay-flag">▼ atrasado</span>`:""}</div>
       </div>
       <div class="pc-people">
-        <div><b>${escapeHtml(L('sponsor'))}</b> ${p.sponsor.length?escapeHtml(p.sponsor.join(", ")):"—"}</div>
-        <div><b>${escapeHtml(L('gerente'))}</b> ${p.gerente.length?escapeHtml(p.gerente.join(", ")):"—"}</div>
-        <div><b>${escapeHtml(L('analista'))}</b> ${p.analistas.length?markInferred(p.analistas.join(", "), p.analistaSource==="heuristic"):"—"} &nbsp;·&nbsp; <b>${escapeHtml(L('pmo'))}</b> ${p.pmo.length?markInferred(p.pmo.join(", "), p.pmoSource==="heuristic"):"—"}</div>
+        <div><b>${escapeHtml(L('sponsor'))}</b> ${avatarInlineListHTML(p.sponsor, 20)}</div>
+        <div><b>${escapeHtml(L('gerente'))}</b> ${avatarInlineListHTML(p.gerente, 20)}</div>
+        <div><b>${escapeHtml(L('analista'))}</b> ${avatarInlineListHTML(p.analistas, 20)}${p.analistaSource==="heuristic"&&p.analistas.length?' <span class="infer-mark">**</span>':""}</div>
+        <div><b>${escapeHtml(L('pmo'))}</b> ${avatarInlineListHTML(p.pmo, 20)}${p.pmoSource==="heuristic"&&p.pmo.length?' <span class="infer-mark">**</span>':""}</div>
       </div>
       ${p.proximoPasso?`<div class="pc-next"><b>${escapeHtml(L('proximoPasso'))}</b>${markInferred(p.proximoPasso, p.proximoPassoSource==="derived")}</div>`:""}
       <div class="pc-prog">
@@ -1347,7 +1358,7 @@ function renderCapacidade(){
     const criticos = projs.filter(p=>p.bucket==="critico").length, atencao = projs.filter(p=>p.bucket==="atencao").length;
     return `
     <div class="cap-card">
-      <div class="cap-head"><h4>${escapeHtml(fn)}</h4><span class="cap-alloc-num" style="color:var(--${cb.cls==='red'?'red':cb.cls==='amber'?'amber':'green'})">${alloc}%</span></div>
+      <div class="cap-head"><div style="display:flex;align-items:center;gap:9px;">${avatarHTML(fn,26)}<h4>${escapeHtml(fn)}</h4></div><span class="cap-alloc-num" style="color:var(--${cb.cls==='red'?'red':cb.cls==='amber'?'amber':'green'})">${alloc}%</span></div>
       <div class="cap-load">${projs.length} projeto${projs.length!==1?"s":""} · capacidade máx. considerada: ${CONFIG.MAX_PROJECTS_PER_ANALYST}</div>
       <div class="cap-bar"><i style="width:${alloc}%;background:var(--${cb.cls==='red'?'red':cb.cls==='amber'?'amber':'green'})"></i></div>
       <div class="cap-sub-badges"><span class="badge ${cb.cls}">${cb.label}</span>${criticos?`<span class="badge red">${criticos} crítico${criticos!==1?"s":""}</span>`:""}${atencao?`<span class="badge amber">${atencao} atenção</span>`:""}</div>
@@ -1372,7 +1383,7 @@ function renderGroupedView(elId, groupFn){
     const avgEvol = Math.round(projs.reduce((s,p)=>s+(p.evolPct??0),0)/projs.length*100);
     return `
     <div class="group-card">
-      <div class="gc-head"><h4>${escapeHtml(name)}</h4><span class="gc-count">${projs.length} projeto${projs.length!==1?"s":""}</span></div>
+      <div class="gc-head"><div style="display:flex;align-items:center;gap:9px;">${avatarHTML(name,26)}<h4>${escapeHtml(name)}</h4></div><span class="gc-count">${projs.length} projeto${projs.length!==1?"s":""}</span></div>
       <div class="gc-status-row">${Object.entries(statusCounts).map(([c,n])=>`<span class="badge ${c}">${n}</span>`).join("")}</div>
       ${projs.map(p=>`<div class="gc-proj" onclick="openModal('${p.id}')"><span>${escapeHtml(p.nome)}</span><span class="badge ${p.statusMeta.color}">${escapeHtml(p.statusMeta.label)}</span></div>`).join("")}
       <div class="gc-avg">Evolução média: ${avgEvol}%</div>
@@ -1544,11 +1555,11 @@ function slideHTML(p){
         <div class="slide-block">
           <div class="sec-label">Governança</div>
           <div class="info-grid">
-            <div class="info-cell"><div class="ic-lbl">${escapeHtml(L('sponsor'))}</div><div class="ic-val">${p.sponsor.length?escapeHtml(p.sponsor.join(", ")):"N/I"}</div></div>
-            <div class="info-cell"><div class="ic-lbl">${escapeHtml(L('gerente'))}</div><div class="ic-val">${p.gerente.length?escapeHtml(p.gerente.join(", ")):"N/I"}</div></div>
-            <div class="info-cell"><div class="ic-lbl">${escapeHtml(L('liderTecnico'))}</div><div class="ic-val">${p.liderTecnico.length?escapeHtml(p.liderTecnico.join(", ")):"N/I"}</div></div>
-            <div class="info-cell"><div class="ic-lbl">${escapeHtml(L('analista'))}</div><div class="ic-val">${p.analistas.length?markInferred(p.analistas.join(", "), p.analistaSource==="heuristic"):"N/I"}</div></div>
-            <div class="info-cell"><div class="ic-lbl">${escapeHtml(L('pmo'))}</div><div class="ic-val">${p.pmo.length?markInferred(p.pmo.join(", "), p.pmoSource==="heuristic"):"N/I"}</div></div>
+            <div class="info-cell"><div class="ic-lbl">${escapeHtml(L('sponsor'))}</div><div class="ic-val">${peopleWithAvatarsHTML(p.sponsor, 22)}</div></div>
+            <div class="info-cell"><div class="ic-lbl">${escapeHtml(L('gerente'))}</div><div class="ic-val">${peopleWithAvatarsHTML(p.gerente, 22)}</div></div>
+            <div class="info-cell"><div class="ic-lbl">${escapeHtml(L('liderTecnico'))}</div><div class="ic-val">${peopleWithAvatarsHTML(p.liderTecnico, 22)}</div></div>
+            <div class="info-cell"><div class="ic-lbl">${escapeHtml(L('analista'))}</div><div class="ic-val">${p.analistas.length?peopleWithAvatarsHTML(p.analistas, 22):"N/I"}${p.analistaSource==="heuristic"&&p.analistas.length?' <span class="infer-mark">**</span>':""}</div></div>
+            <div class="info-cell"><div class="ic-lbl">${escapeHtml(L('pmo'))}</div><div class="ic-val">${p.pmo.length?peopleWithAvatarsHTML(p.pmo, 22):"N/I"}${p.pmoSource==="heuristic"&&p.pmo.length?' <span class="infer-mark">**</span>':""}</div></div>
           </div>
         </div>
         <div class="slide-block">
