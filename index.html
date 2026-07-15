@@ -1351,14 +1351,15 @@ function renderProjetos(){
 function capBucket(allocPct){ if(allocPct>90) return {cls:"red", label:"Sobrecarga"}; if(allocPct>70) return {cls:"amber", label:"Atenção"}; return {cls:"green", label:"Saudável"}; }
 function renderCapacidade(){
   const P = state.projects;
-  const cards = CONFIG.TEAM_ROSTER.map(fn=>{
-    const projs = P.filter(p=> p.analistas.includes(fn));
+  const allAnalistas = uniqueSorted(P.flatMap(p=>p.analistas));
+  const cards = allAnalistas.map(name=>{
+    const projs = P.filter(p=> p.analistas.includes(name));
     const alloc = Math.round(Math.min(100, projs.length/CONFIG.MAX_PROJECTS_PER_ANALYST*100));
     const cb = capBucket(alloc);
     const criticos = projs.filter(p=>p.bucket==="critico").length, atencao = projs.filter(p=>p.bucket==="atencao").length;
     return `
     <div class="cap-card">
-      <div class="cap-head"><div style="display:flex;align-items:center;gap:9px;">${avatarHTML(fn,26)}<h4>${escapeHtml(fn)}</h4></div><span class="cap-alloc-num" style="color:var(--${cb.cls==='red'?'red':cb.cls==='amber'?'amber':'green'})">${alloc}%</span></div>
+      <div class="cap-head"><div style="display:flex;align-items:center;gap:9px;">${avatarHTML(name,26)}<h4>${escapeHtml(name)}</h4></div><span class="cap-alloc-num" style="color:var(--${cb.cls==='red'?'red':cb.cls==='amber'?'amber':'green'})">${alloc}%</span></div>
       <div class="cap-load">${projs.length} projeto${projs.length!==1?"s":""} · capacidade máx. considerada: ${CONFIG.MAX_PROJECTS_PER_ANALYST}</div>
       <div class="cap-bar"><i style="width:${alloc}%;background:var(--${cb.cls==='red'?'red':cb.cls==='amber'?'amber':'green'})"></i></div>
       <div class="cap-sub-badges"><span class="badge ${cb.cls}">${cb.label}</span>${criticos?`<span class="badge red">${criticos} crítico${criticos!==1?"s":""}</span>`:""}${atencao?`<span class="badge amber">${atencao} atenção</span>`:""}</div>
@@ -1366,7 +1367,7 @@ function renderCapacidade(){
     </div>`;
   }).join("");
   const unassigned = P.filter(p=> p.analistas.length===0).length;
-  document.getElementById("capGrid").innerHTML = cards + (unassigned ? `<div class="cap-card"><div class="cap-head"><h4>Sem analista identificado</h4><span class="badge gray">${unassigned}</span></div><div class="cap-load">Projetos cujo campo de governança não citou nenhum analista do time.</div></div>` : "");
+  document.getElementById("capGrid").innerHTML = (cards || `<div class="empty-state">Nenhum analista identificado ainda na coluna Analista Direto.</div>`) + (unassigned ? `<div class="cap-card"><div class="cap-head"><h4>Sem analista identificado</h4><span class="badge gray">${unassigned}</span></div><div class="cap-load">Projetos cujo campo Analista Direto ainda não foi preenchido.</div></div>` : "");
 }
 
 function renderGroupedView(elId, groupFn){
@@ -1416,11 +1417,11 @@ function renderIndicadores(){
     : `<div style="color:var(--text-lo);font-size:12px;">Sem dados suficientes.</div>`;
 
   const capMap = new Map();
-  CONFIG.TEAM_ROSTER.forEach(fn=>{ const n = P.filter(p=>p.analistas.includes(fn)).length; capMap.set(fn, Math.round(Math.min(100, n/CONFIG.MAX_PROJECTS_PER_ANALYST*100))); });
-  document.getElementById("chartCapacidade").innerHTML = [...capMap.entries()].map(([fn,alloc])=>{
+  uniqueSorted(P.flatMap(p=>p.analistas)).forEach(name=>{ const n = P.filter(p=>p.analistas.includes(name)).length; capMap.set(name, Math.round(Math.min(100, n/CONFIG.MAX_PROJECTS_PER_ANALYST*100))); });
+  document.getElementById("chartCapacidade").innerHTML = [...capMap.entries()].map(([name,alloc])=>{
     const cb = capBucket(alloc);
-    return `<div class="bar-row"><span class="br-label">${escapeHtml(fn)}</span><span class="br-track"><span class="br-fill" style="width:${alloc}%;background:var(--${cb.cls==='red'?'red':cb.cls==='amber'?'amber':'green'})"></span></span><span class="br-val">${alloc}%</span></div>`;
-  }).join("");
+    return `<div class="bar-row"><span class="br-label">${escapeHtml(name)}</span><span class="br-track"><span class="br-fill" style="width:${alloc}%;background:var(--${cb.cls==='red'?'red':cb.cls==='amber'?'amber':'green'})"></span></span><span class="br-val">${alloc}%</span></div>`;
+  }).join("") || `<div style="color:var(--text-lo);font-size:12px;">Nenhum analista identificado ainda.</div>`;
 }
 
 function renderRiscos(){
