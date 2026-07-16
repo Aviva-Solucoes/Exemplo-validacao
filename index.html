@@ -787,6 +787,7 @@ const CONFIG = {
   PMO_ROSTER: ["Fernando Dadamos", "Geovanna Nogueira"],
   MAX_PROJECTS_PER_ANALYST: 6,
   CACHE_KEY: "portfolio_ti_csv_cache_v1",
+  PROJECT_LOG_KEY: "portfolio_ti_project_changes_v1",
   // Planilha à parte, só com Nome + Foto (link de imagem). Usada pra mostrar avatares nas
   // pessoas mencionadas no portfólio — opcional: se falhar ou não tiver a pessoa, cai no
   // ícone genérico automaticamente.
@@ -889,6 +890,10 @@ function formatDateBR(v){
 // no horário da última sincronização bem-sucedida com a planilha.
 function lastUpdatedLabel(p){
   if(p.ultimaAtualizacao) return formatDateBR(p.ultimaAtualizacao);
+  if(p.localLastChanged){
+    const d = new Date(p.localLastChanged);
+    if(!isNaN(d.getTime())) return d.toLocaleDateString("pt-BR") + " às " + d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  }
   if(state.lastUpdated) return state.lastUpdated.toLocaleDateString("pt-BR") + " às " + state.lastUpdated.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
   return null;
 }
@@ -1212,13 +1217,37 @@ function showStale(ts, isSeed){
 }
 function showManualPaste(show){ document.getElementById("manualPaste").classList.toggle("hidden", !show); }
 
+// Compara o conteúdo de cada linha com a última versão salva no navegador — só atualiza
+// o "carimbo" de data daquele projeto se algo nele realmente mudou desde a última vez.
+// Projetos sem alteração mantêm a data antiga; projetos novos ou nunca vistos ganham a
+// data de agora (funcionando como base inicial na primeira vez que essa planilha é lida).
+function loadProjectLog(){
+  try{ return JSON.parse(localStorage.getItem(CONFIG.PROJECT_LOG_KEY)) || {}; }catch(e){ return {}; }
+}
+function saveProjectLog(log){ try{ localStorage.setItem(CONFIG.PROJECT_LOG_KEY, JSON.stringify(log)); }catch(e){} }
+function trackProjectChanges(rows){
+  const log = loadProjectLog();
+  const now = new Date().toISOString();
+  let dirty = false;
+  rows.forEach(row=>{
+    const id = row["ID"];
+    if(!id) return;
+    const fp = JSON.stringify(row);
+    if(!log[id] || log[id].fp !== fp){ log[id] = {fp, ts: now}; dirty = true; }
+  });
+  if(dirty) saveProjectLog(log);
+  return log;
+}
 function processRows(rows){
   const seen = new Set();
   const projects = [];
+  const changeLog = trackProjectChanges(rows);
   rows.forEach(row=>{
     if(!row["ID"] || seen.has(row["ID"])) return;
     seen.add(row["ID"]);
-    projects.push(buildProject(row));
+    const proj = buildProject(row);
+    proj.localLastChanged = changeLog[proj.id] ? changeLog[proj.id].ts : null;
+    projects.push(proj);
   });
   if(rows.length) state.labels = computeLabels(Object.keys(rows[0]));
   return projects;
@@ -1812,7 +1841,7 @@ function projectDetailHTML(p){
         <div class="sec-label">Linha do tempo</div>
         ${horizontalTimelineHTML(p.marcos, p.currentMarco)}
       </div>
-      <div style="color:var(--text-lo);font-size:11px;">Última atualização do projeto: ${p.ultimaAtualizacao?escapeHtml(p.ultimaAtualizacao):(state.lastUpdated?state.lastUpdated.toLocaleString("pt-BR"):"N/I")}${anyInferred?' &nbsp;·&nbsp; <span class="infer-mark">**</span> Informação preenchida pela IA':""}</div>
+      <div style="color:var(--text-lo);font-size:11px;">Última atualização do projeto: ${lastUpdatedLabel(p)?escapeHtml(lastUpdatedLabel(p)):"N/I"}${anyInferred?' &nbsp;·&nbsp; <span class="infer-mark">**</span> Informação preenchida pela IA':""}</div>
     </div>
   `;
 }
