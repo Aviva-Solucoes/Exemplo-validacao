@@ -295,6 +295,7 @@ main.content{padding:26px 30px 50px;max-width:1560px;}
 .proj-card .pc-bar i{display:block;height:100%;border-radius:4px;}
 .proj-card .pc-bar .planned-tick{position:absolute;top:-2px;width:2px;height:10px;background:var(--text-md);}
 .proj-card .pc-bar-wrap .planned-pct{position:absolute;top:9px;transform:translateX(-50%);font-size:8.5px;font-weight:700;color:var(--text-lo);white-space:nowrap;}
+.pc-updated{font-size:9px;color:var(--text-lo);text-align:right;margin-top:-3px;}
 
 /* ================= tabelas de agrupamento ================= */
 .group-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
@@ -477,7 +478,8 @@ main.content{padding:26px 30px 50px;max-width:1560px;}
 .slide-stage{width:100%;aspect-ratio:16/9;background:var(--bg-card);border:1px solid var(--border);border-radius:18px;overflow:hidden;box-shadow:var(--shadow-lg);position:relative;}
 .slide-stage::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--grad-accent);z-index:2;}
 .slide-stage:fullscreen{border-radius:0;aspect-ratio:auto;background:#fff;}
-.slide-inner{height:100%;width:100%;display:flex;flex-direction:column;padding:22px 28px;gap:12px;overflow:hidden;}
+.slide-inner{height:100%;width:100%;display:flex;flex-direction:column;padding:22px 28px;gap:12px;overflow:hidden;position:relative;}
+.slide-updated{position:absolute;right:14px;bottom:6px;font-size:8.5px;color:var(--text-lo);opacity:.75;z-index:4;}
 .slide-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;border-bottom:1px solid var(--border);padding-bottom:12px;flex:none;}
 .slide-header .sh-id{font-size:11px;color:var(--teal-600);letter-spacing:.09em;font-weight:700;}
 .slide-header h2{font-size:clamp(16px,1.9vw,23px);margin-top:3px;}
@@ -882,6 +884,13 @@ function formatDateBR(v){
   m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if(m) return `${m[1].padStart(2,"0")}/${m[2].padStart(2,"0")}/${m[3]}`;
   return s;
+}
+// Rótulo discreto de "última atualização" — usa a coluna dedicada quando existir, senão cai
+// no horário da última sincronização bem-sucedida com a planilha.
+function lastUpdatedLabel(p){
+  if(p.ultimaAtualizacao) return formatDateBR(p.ultimaAtualizacao);
+  if(state.lastUpdated) return state.lastUpdated.toLocaleDateString("pt-BR") + " às " + state.lastUpdated.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  return null;
 }
 function formatMM(n){
   if(n==null || isNaN(n) || n<=0) return "N/I";
@@ -1482,6 +1491,7 @@ function renderProjetos(){
           ${p.plannedPct!=null?`<span class="planned-pct" style="left:${Math.round(p.plannedPct*100)}%">${Math.round(p.plannedPct*100)}%</span>`:""}
         </div>
       </div>
+      ${lastUpdatedLabel(p)?`<div class="pc-updated">Última atualização: ${escapeHtml(lastUpdatedLabel(p))}</div>`:""}
     </div>`).join("") : `<div class="empty-state">${icon("search")}<div>Nenhum projeto encontrado com esses filtros.</div></div>`;
 }
 
@@ -1888,6 +1898,7 @@ function slideHTML(p){
     <div class="slide-timeline-strip">
       ${horizontalTimelineCompactHTML(p.marcos, p.currentMarco)}
     </div>
+    ${lastUpdatedLabel(p)?`<div class="slide-updated">Última atualização: ${escapeHtml(lastUpdatedLabel(p))}</div>`:""}
   `;
 }
 function renderPresentation(){
