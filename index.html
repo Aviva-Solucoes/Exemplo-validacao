@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Carlito:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
   --font-main:'Calibri','Carlito','Segoe UI',sans-serif;
@@ -548,15 +550,6 @@ main.content{padding:26px 30px 50px;max-width:1560px;}
   .search-input{width:160px;}
 }
 .footer-note{margin-top:36px;padding:18px 0;border-top:1px solid var(--border);color:var(--text-lo);font-size:11.5px;line-height:1.6;text-align:center;}
-
-@media print{
-  @page{ size: landscape; margin: 8mm; }
-  body{background:#fff !important;}
-  .sidebar, .content-topbar, .pres-controls, .footer-note{display:none !important;}
-  main.content{padding:0 !important;max-width:none !important;}
-  .slide-stage{box-shadow:none !important;border:none !important;aspect-ratio:auto !important;width:100% !important;height:auto !important;}
-  .slide-inner{height:auto !important;}
-}
 .app-version{display:inline-block;margin-top:8px;font-family:var(--font-main);font-size:10px;color:var(--text-lo);opacity:.7;letter-spacing:.02em;}
 </style>
 </head>
@@ -737,7 +730,8 @@ main.content{padding:26px 30px 50px;max-width:1560px;}
           <button class="icon-btn" id="presNext" title="Próximo projeto"><svg class="icon" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
           <span class="pres-counter" id="presCounter"></span>
           <button class="icon-btn" id="presFullscreen" title="Tela cheia"><svg class="icon" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
-          <button class="btn-primary" id="presDownloadPdf" title="Baixar este slide em PDF"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>PDF</button>
+          <button class="btn-secondary" id="presDownloadCurrent" title="Baixar só este projeto em PDF"><svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px;"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg> Este projeto</button>
+          <button class="btn-primary" id="presDownloadAll" title="Baixar todos os projetos do filtro atual em um único PDF"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Baixar tudo (PDF)</button>
         </div>
         <div class="slide-stage" id="slideStage"><div class="slide-inner" id="slideInner"></div></div>
       </section>
@@ -794,8 +788,8 @@ const SEED_DATA = [{"ID": "ECO-001", "Projeto": "Programa | Ecossistema de Fidel
 const CONFIG = {
   // Versionamento semântico (MAJOR.MINOR.PATCH) — ver CHANGELOG.md para o histórico completo.
   // Suba MAJOR em mudança estrutural grande, MINOR em funcionalidade nova, PATCH em ajuste/correção.
-  VERSION: "3.2.0",
-  BUILD_DATE: "2026-07-16",
+  VERSION: "3.3.0",
+  BUILD_DATE: "2026-07-20",
   CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCXIeZtf9qqG0la-MFKkAvDEp0_8lrA_wczZOEvgXq6Ya_w8i1HwFzSnmOV7IAW2wmLezHVZ9_nxQ1/pub?output=csv",
   // Opcional, mas recomendado: URL de um Google Apps Script Web App (doGet) publicado a partir
   // da própria planilha, retornando o CSV. Esse tipo de endpoint responde com cabeçalho CORS
@@ -1993,7 +1987,52 @@ function renderPresentation(){
 }
 document.getElementById("presPrev").addEventListener("click", ()=>{ state.presIndex--; renderPresentation(); });
 document.getElementById("presNext").addEventListener("click", ()=>{ state.presIndex++; renderPresentation(); });
-document.getElementById("presDownloadPdf").addEventListener("click", ()=>{ window.print(); });
+// Gera um PDF de verdade (baixa o arquivo direto, sem passar pela caixa de diálogo de
+// impressão do navegador). Renderiza cada projeto no próprio palco do slide, captura como
+// imagem (html2canvas) e monta uma página por projeto no PDF (jsPDF).
+async function exportProjectsToPDF(projects, filename){
+  if(!projects.length) return;
+  const btnCur = document.getElementById("presDownloadCurrent");
+  const btnAll = document.getElementById("presDownloadAll");
+  const stage = document.getElementById("slideStage");
+  const slideInner = document.getElementById("slideInner");
+  const originalHTML = slideInner.innerHTML;
+  const originalCurLabel = btnCur.innerHTML, originalAllLabel = btnAll.innerHTML;
+  btnCur.disabled = true; btnAll.disabled = true;
+  try{
+    let pdf = null;
+    for(let i=0;i<projects.length;i++){
+      const label = `Gerando… (${i+1}/${projects.length})`;
+      btnCur.textContent = label; btnAll.textContent = label;
+      slideInner.innerHTML = slideHTML(projects[i]);
+      await new Promise(r=>setTimeout(r,80)); // dá tempo do layout assentar antes de capturar
+      const canvas = await html2canvas(stage, {scale:2, backgroundColor:"#ffffff", useCORS:true});
+      const imgData = canvas.toDataURL("image/jpeg", 0.93);
+      if(!pdf){ pdf = new window.jspdf.jsPDF({orientation:"landscape", unit:"px", format:[canvas.width, canvas.height]}); }
+      else { pdf.addPage([canvas.width, canvas.height], "landscape"); }
+      pdf.addImage(imgData, "JPEG", 0, 0, canvas.width, canvas.height);
+    }
+    pdf.save(filename);
+  }catch(e){
+    console.error(e);
+    alert("Não foi possível gerar o PDF: " + e.message);
+  }finally{
+    slideInner.innerHTML = originalHTML;
+    btnCur.disabled = false; btnAll.disabled = false;
+    btnCur.innerHTML = originalCurLabel; btnAll.innerHTML = originalAllLabel;
+  }
+}
+document.getElementById("presDownloadCurrent").addEventListener("click", ()=>{
+  const list = presentationList();
+  const p = list[state.presIndex];
+  if(p) exportProjectsToPDF([p], `projeto-${p.id}.pdf`);
+});
+document.getElementById("presDownloadAll").addEventListener("click", ()=>{
+  const list = presentationList();
+  const tipo = document.getElementById("presTipo").value;
+  const sufixo = tipo ? "-"+tipo.toLowerCase().replace(/\s+/g,"-") : "";
+  exportProjectsToPDF(list, `portfolio-apresentacao${sufixo}-${new Date().toISOString().slice(0,10)}.pdf`);
+});
 document.getElementById("presFullscreen").addEventListener("click", ()=>{
   const el = document.getElementById("slideStage");
   if(document.fullscreenElement) document.exitFullscreen(); else el.requestFullscreen();
